@@ -941,7 +941,19 @@ async function genManual() {
   document.getElementById('manualOut').innerHTML = `<div class="loading-box"><div class="spinner"></div><p>Analizando material...</p></div>`;
   const text = s.files.filter(f=>f.content&&!f.content.startsWith('data:')).map(f=>`\n=== ${f.name} ===\n${f.content}`).join('');
   try {
-    const prompt = `Sos un asistente académico de la Facultad de Economía UDELAR (Uruguay). Creá un MANUAL INTELIGENTE completo en español para la materia "${s.name}". El manual debe incluir: 1) RESUMEN EJECUTIVO breve, 2) CONCEPTOS Y DEFINICIONES CLAVE con definición formal de cada uno, 3) DESARROLLO TEMÁTICO por bloques, 4) RELACIONES ENTRE CONCEPTOS, 5) PUNTOS CRÍTICOS PARA EL EXAMEN, 6) FÓRMULAS Y MODELOS si aplica. Usá HTML básico: <h2> para secciones, <h3> subsecciones, <strong> para términos clave, <ul><li> para listas, <div class="definition"> para definiciones. Sin Markdown, solo HTML. MATERIAL: ${text||'Materia: '+s.name}`;
+    const prompt = `Sos un asistente académico de la Facultad de Economía UDELAR Uruguay. Analizá este material de "${s.name}" y creá un MANUAL DE ESTUDIO DETALLADO en español. NO hagas índice ni tabla de contenidos. Empezá directamente con el contenido.
+
+Estructurá así:
+- RESUMEN EJECUTIVO: párrafo breve del tema central
+- CONCEPTOS CLAVE: cada concepto con su definición completa y detallada
+- DESARROLLO: explicá cada tema del material en profundidad
+- NORMATIVA: artículos y normas importantes mencionados
+- PARA EL EXAMEN: los puntos más importantes a recordar
+
+BASATE ÚNICAMENTE en el material. Usá HTML: <h2> secciones, <h3> subsecciones, <strong> términos importantes, <ul><li> listas, <div class="definition"> para definiciones formales. Sin Markdown, sin índices.
+
+MATERIAL:
+${text}`;
     const html = await gemini(prompt, 2000);
     s.manualContent = html;
     save();
