@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>StudyOS</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -522,6 +523,28 @@
 </div>
 
 <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function extractPDFText(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=async(e)=>{
+      try{
+        const pdf=await pdfjsLib.getDocument({data:new Uint8Array(e.target.result)}).promise;
+        let text='';
+        for(let i=1;i<=Math.min(pdf.numPages,50);i++){
+          const page=await pdf.getPage(i);
+          const content=await page.getTextContent();
+          text+='\n--- Pag '+i+' ---\n'+content.items.map(x=>x.str).join(' ');
+        }
+        resolve(text.substring(0,25000));
+      }catch(err){reject(err);}
+    };
+    reader.onerror=reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
 // ══ STATE ══
 let subjects = [];
 let activeId = null;
@@ -776,12 +799,16 @@ function buildPlan(d) {
 function renderFilesList(s) {
   const el = document.getElementById('filesList'); if (!el) return;
   if (!s.files || !s.files.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="files-list">${s.files.map((f,i)=>`
-    <div class="file-chip">
-      <span>${fIcon(f.name)}</span>
-      <span class="fname">${f.name}</span>
-      <span class="file-remove" onclick="rmFile(${i})">✕</span>
-    </div>`).join('')}</div>`;
+  el.innerHTML = '<div class="files-list">' + s.files.map((f,i) => {
+    const hasText = f.content && f.content.length > 10;
+    const status = f.reading ? ' <span style="color:var(--accent);font-size:11px">leyendo...</span>' : 
+                   hasText ? ' <span style="color:var(--green);font-size:11px">✓ leido</span>' : '';
+    return '<div class="file-chip" style="' + (f.reading ? 'border-color:var(--accent)' : '') + '">' +
+      '<span>' + fIcon(f.name) + '</span>' +
+      '<span class="fname">' + f.name + status + '</span>' +
+      '<span class="file-remove" onclick="rmFile(' + i + ')">✕</span>' +
+      '</div>';
+  }).join('') + '</div>';
 }
 function fIcon(n) {
   const e = n.split('.').pop().toLowerCase();
@@ -792,26 +819,41 @@ function rmFile(i) {
   const s = sub(); s.files.splice(i,1); save(); renderFilesList(s);
 }
 
-// FILE INPUT — direct button.onclick approach for Android compatibility
-function handleFiles(fl) {
+// FILE INPUT with PDF.js text extraction
+async function handleFiles(fl) {
   const s = sub(); if (!s) return;
   if (!s.files) s.files = [];
-  Array.from(fl).forEach(f => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      s.files.push({name:f.name, size:f.size, type:'doc', content: e.target.result.substring(0, 20000)});
-      save();
-      renderFilesList(s);
-    };
-    reader.onerror = () => {
-      s.files.push({name:f.name, size:f.size, type:'doc', content:''});
-      save();
-      renderFilesList(s);
-    };
-    if (f.type.startsWith('image/')) reader.readAsDataURL(f);
-    else reader.readAsText(f);
-  });
-  document.getElementById('fileInput').value = '';
+  
+  for (const f of Array.from(fl)) {
+    const fo = {name:f.name, size:f.size, type:'doc', content:'', reading:true};
+    s.files.push(fo);
+    save();
+    renderFilesList(s);
+    
+    try {
+      if (f.name.toLowerCase().endsWith('.pdf')) {
+        fo.content = await extractPDFText(f);
+      } else if (f.type.startsWith('image/')) {
+        fo.content = '[Imagen: ' + f.name + ']';
+      } else {
+        fo.content = await new Promise((res,rej) => {
+          const r = new FileReader();
+          r.onload = e => res(e.target.result.substring(0, 25000));
+          r.onerror = rej;
+          r.readAsText(f);
+        });
+      }
+    } catch(err) {
+      fo.content = '[Error leyendo ' + f.name + ': ' + err.message + ']';
+    }
+    
+    fo.reading = false;
+    save();
+    renderFilesList(s);
+  }
+  
+  const inputs = document.querySelectorAll('input[type="file"]');
+  inputs.forEach(i => i.value = '');
 }
 
 // AUDIO FILES — read as base64, then transcribe with AI
@@ -955,7 +997,9 @@ async function genFlash() {
   const s = sub(); if (!s||!s.files||!s.files.length) return;
   fcIdx = 0;
   document.getElementById('flashOut').innerHTML = `<div class="loading-box"><div class="spinner"></div><p>Creando tarjetas...</p></div>`;
-  const text = s.files.filter(f=>f.content&&!f.content.startsWith('data:')).map(f=>f.content).join('\n\n');
+  const textFiles2 = s.files.filter(f=>f.content&&f.content.length>10&&!f.content.startsWith('data:'));
+  if(!textFiles2.length){document.getElementById('flashOut').innerHTML='<div style="color:var(--red);padding:14px;background:var(--surface);border-radius:12px;border:1px solid var(--border)">❌ Sin texto extraible aun.</div>';return;}
+  const text = textFiles2.map(f=>f.content).join('\n\n');
   try {
     const prompt = `Materia "${s.name}" UDELAR Economía Uruguay. Creá exactamente 16 flashcards de estudio. Devolvé ÚNICAMENTE un array JSON válido, sin texto antes ni después, sin backticks, sin markdown: [{"q":"pregunta concisa","a":"respuesta de 1 a 3 oraciones"},{"q":"...","a":"..."}]. MATERIAL: ${text.substring(0,8000)||s.name}`;
     const raw = (await gemini(prompt, 2000)).replace(/\`\`\`json|\`\`\`/g,'').trim();
@@ -1060,7 +1104,9 @@ async function genQuiz() {
   const s = sub(); if (!s||!s.files||!s.files.length) return;
   quizAnswered = {};
   document.getElementById('quizOut').innerHTML = `<div class="loading-box"><div class="spinner"></div><p>Generando cuestionario estilo UDELAR...</p></div>`;
-  const text = s.files.filter(f=>f.content&&!f.content.startsWith('data:')).map(f=>f.content).join('\n\n');
+  const textFiles3 = s.files.filter(f=>f.content&&f.content.length>10&&!f.content.startsWith('data:'));
+  if(!textFiles3.length){document.getElementById('quizOut').innerHTML='<div style="color:var(--red);padding:14px;background:var(--surface);border-radius:12px;border:1px solid var(--border)">❌ Sin texto extraible aun.</div>';return;}
+  const text = textFiles3.map(f=>f.content).join('\n\n');
   try {
     const rawQ = (await gemini(`Sos docente de la Facultad de Economía UDELAR Uruguay. Generá un cuestionario para "${s.name}" con exactamente 10 preguntas. Devolvé ÚNICAMENTE JSON válido, sin texto extra, sin backticks: [{"type":"mc","question":"texto","options":["A","B","C","D"],"correct":0,"explanation":"por qué A es correcta"},{"type":"open","question":"texto","answer":"respuesta completa esperada"}]. 6 preguntas mc + 4 preguntas open. Dificultad media-alta estilo examen real UDELAR. MATERIAL: ${text.substring(0,8000)||s.name}`, 2500)).replace(/\`\`\`json|\`\`\`/g,'').trim();
     const startQ = rawQ.indexOf('['); const endQ = rawQ.lastIndexOf(']');
