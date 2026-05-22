@@ -364,29 +364,18 @@ async function GM(){
   if(!CK())return;const s=G();if(!s)return;
   const tf=s.files.filter(f=>f.txt&&f.txt.length>5);
   if(!tf.length){document.getElementById("MO").innerHTML="<div class=\"err\">❌ Los archivos no tienen texto extraible. Verificá que el PDF no sea imagen escaneada.</div>";return}
-  document.getElementById("MO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Analizando ${tf.length} archivo${tf.length>1?"s":""}...</p></div>`;
+  const mo=document.getElementById("MO");
+  mo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Parte 1/2: Resumen y conceptos...</p></div>`;
   const txt=tf.map(f=>"\n=== "+f.name+" ===\n"+f.txt).join("\n").substring(0,20000);
+  const base=`Sos asistente académico UDELAR Uruguay. Basate ÚNICAMENTE en este material de "${s.name}".\nUsá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> listas, <div class="definition"> para definiciones. Sin Markdown. Sé MUY DETALLADO.\n\nMATERIAL:\n${txt}`;
+  const p1=base+`\n\nGENERÁ ÚNICAMENTE estas dos secciones (no agregues más):\n1. <h2>RESUMEN EJECUTIVO</h2> — párrafo completo explicando el tema central\n2. <h2>CONCEPTOS CLAVE</h2> — TODOS los conceptos con definición completa, características y ejemplos`;
+  const p2=base+`\n\nGENERÁ ÚNICAMENTE estas tres secciones (no agregues más):\n1. <h2>DESARROLLO</h2> — explicá cada tema en profundidad con subsecciones <h3>\n2. <h2>NORMATIVA</h2> — artículos, normas, condiciones y límites importantes\n3. <h2>PARA EL EXAMEN</h2> — puntos críticos, trampas frecuentes y lo que más entra`;
   try{
-    const p=`Sos asistente académico UDELAR Uruguay. Analizá DETALLADAMENTE el material de "${s.name}" y creá un MANUAL DE ESTUDIO COMPLETO en español.
-
-NO hagas índice ni tabla de contenidos. Empezá DIRECTAMENTE con el contenido.
-
-Estructura:
-- RESUMEN EJECUTIVO: párrafo explicando el tema central
-- CONCEPTOS CLAVE: cada concepto con definición completa
-- DESARROLLO: explicá cada tema en profundidad
-- NORMATIVA: artículos y normas importantes
-- PARA EL EXAMEN: puntos críticos a recordar
-
-Sé MUY DETALLADO. Basate ÚNICAMENTE en el material.
-Usá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> listas, <div class="definition"> para definiciones. Sin Markdown.
-
-MATERIAL:
-${txt}`;
-    const html=await AI(p,6000);
+    const [h1,h2]=await Promise.all([AI(p1,4000),AI(p2,4000)]);
+    const html=h1+"\n"+h2;
     s.man=html;SV();
-    document.getElementById("MO").innerHTML=`<div class="abox"><div class="abh"><span>✦ Manual — ${s.name}</span><button onclick="CP()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${html}</div></div>`;
-  }catch(e){document.getElementById("MO").innerHTML=`<div class="err">❌ ${e.message}</div>`}
+    mo.innerHTML=`<div class="abox"><div class="abh"><span>✦ Manual — ${s.name}</span><button onclick="CP()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${html}</div></div>`;
+  }catch(e){mo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
 }
 function CP(){const s=G();if(!s||!s.man)return;const d=document.createElement("div");d.innerHTML=s.man;navigator.clipboard.writeText(d.textContent).catch(()=>{})}
 
@@ -442,7 +431,7 @@ function TQ(s,c){
   const ok=s.files&&s.files.some(f=>f.txt&&f.txt.length>5);
   c.innerHTML=`
     <div class="tt">🧠 Cuestionario</div>
-    <div class="ts">Múltiple opción + preguntas abiertas estilo UDELAR.</div>
+    <div class="ts">25 preguntas: múltiple opción + desarrollo estilo UDELAR.</div>
     ${has?`<div class="brow"><button class="btn2" onclick="RQ()">↺ Reiniciar</button><button class="btn" onclick="GQ()">↻ Nuevo</button></div>`:`<button class="btn" onclick="GQ()" ${!ok?"disabled":""}>✦ Generar Cuestionario</button>`}
     ${!ok?"<p style=\"font-size:12px;color:var(--t2);text-align:center;margin-top:4px\">Subí material primero.</p>":""}
     <div id="QO" style="margin-top:16px">${has?QC(s):""}</div>`;
@@ -480,19 +469,18 @@ async function GQ(){
   if(!CK())return;const s=G();qa={};
   const tf=s.files.filter(f=>f.txt&&f.txt.length>5);
   if(!tf.length){alert("Subí material primero.");return}
-  document.getElementById("QO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando cuestionario...</p></div>`;
-  const txt=tf.map(f=>f.txt).join("\n\n");
+  const qo=document.getElementById("QO");
+  qo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando 25 preguntas...</p></div>`;
+  const txt=tf.map(f=>f.txt).join("\n\n").substring(0,12000);
+  const base=`Sos docente UDELAR. Basate ÚNICAMENTE en este material de "${s.name}". Devolvé SOLO el array JSON empezando con [ y terminando con ], sin texto antes ni después, sin backticks.\n\nMATERIAL:\n${txt}`;
+  const p1=base+`\n\nCreá exactamente 18 preguntas de múltiple opción. Formato: [{"type":"mc","question":"pregunta","options":["A","B","C","D"],"correct":0,"explanation":"por qué es correcta"},...]\nDificultad media-alta. Variá los temas. Solo el array JSON.`;
+  const p2=base+`\n\nCreá exactamente 7 preguntas de desarrollo/abiertas. Formato: [{"type":"open","question":"pregunta","answer":"respuesta esperada detallada"},...]\nDificultad media-alta. Variá los temas. Solo el array JSON.`;
   try{
-    const raw=(await AI(`Sos docente UDELAR. Basándote ÚNICAMENTE en este material, creá 6 preguntas de examen para "${s.name}". Devolvé SOLO el array JSON empezando con [ y terminando con ], sin texto antes ni después:
-[{"type":"mc","question":"pregunta","options":["A","B","C","D"],"correct":0,"explanation":"por que A"},{"type":"open","question":"pregunta","answer":"respuesta esperada"}]
-4 mc + 2 open. Dificultad media-alta.
-
-MATERIAL:
-${txt.substring(0,8000)}`,2000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
-    const st=raw.indexOf("["),en=raw.lastIndexOf("]");
-    s.quiz=JSON.parse(raw.substring(st,en+1));SV();
-    document.getElementById("QO").innerHTML=QC(s);
-  }catch(e){document.getElementById("QO").innerHTML=`<div class="err">❌ ${e.message}</div>`}
+    const [r1,r2]=await Promise.all([AI(p1,4000),AI(p2,2000)]);
+    const parse=r=>{const s=r.replace(/\`\`\`json|\`\`\`/g,"").trim();return JSON.parse(s.substring(s.indexOf("["),s.lastIndexOf("]")+1))};
+    s.quiz=[...parse(r1),...parse(r2)];SV();
+    qo.innerHTML=QC(s);
+  }catch(e){qo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
 }
 function RQ(){qa={};document.getElementById("QO").innerHTML=QC(G())}
 
