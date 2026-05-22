@@ -532,8 +532,8 @@ let fcIdx = 0;
 const COLORS = ['#7c6af7','#f06292','#4dd0c4','#f5c842','#56d67b','#ff8a65','#90caf9','#ce93d8'];
 
 // ══ API KEY ══
-function getKey() { return localStorage.getItem('studyos_geminikey') || ''; }
-function saveKey(k) { localStorage.setItem('studyos_geminikey', k.trim()); }
+function getKey() { return localStorage.getItem('studyos_anthropickey') || ''; }
+function saveKey(k) { localStorage.setItem('studyos_anthropickey', k.trim()); }
 function apiHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -546,18 +546,24 @@ function checkKey() {
   if (!getKey()) { openModal('keyModal'); return false; }
   return true;
 }
-function geminiText(data) {
-  try { return data.candidates[0].content.parts.map(p=>p.text||'').join(''); } catch(e) { return ''; }
-}
 async function gemini(prompt, maxTokens=2000) {
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${getKey()}`,
-    { method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ contents:[{parts:[{text:prompt}]}], generationConfig:{maxOutputTokens:maxTokens} }) }
-  );
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'Content-Type':'application/json',
+      'x-api-key': getKey(),
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      messages:[{role:'user', content: prompt}]
+    })
+  });
   const d = await r.json();
-  if (d.error) throw new Error(d.error.message);
-  return geminiText(d);
+  if (d.error) throw new Error(d.error.message || JSON.stringify(d.error));
+  return d.content.map(b=>b.text||'').join('');
 }
 
 // ══ INIT ══
