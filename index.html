@@ -443,6 +443,16 @@
   ::-webkit-scrollbar { width:4px; }
   ::-webkit-scrollbar-track { background:transparent; }
   ::-webkit-scrollbar-thumb { background:var(--border); border-radius:10px; }
+
+  /* Force dark theme in AI output */
+  .ai-box-body { color: var(--text) !important; background: var(--surface) !important; }
+  .ai-box-body * { color: var(--text) !important; background: transparent !important; border-color: var(--border) !important; }
+  .ai-box-body h1, .ai-box-body h2 { color: var(--accent) !important; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; margin: 14px 0 5px; padding-bottom: 4px; border-bottom: 1px solid rgba(124,106,247,.25) !important; }
+  .ai-box-body h3, .ai-box-body h4 { color: var(--accent3) !important; font-size: 13px; margin: 10px 0 4px; }
+  .ai-box-body strong, .ai-box-body b { color: var(--yellow) !important; font-weight: 700; }
+  .ai-box-body .definition, .ai-box-body blockquote { background: rgba(77,208,196,.08) !important; border-left: 3px solid var(--accent3) !important; padding: 8px 12px; border-radius: 0 8px 8px 0; }
+  .ai-box-body td, .ai-box-body th { background: var(--surface2) !important; border: 1px solid var(--border) !important; padding: 7px; }
+  .ai-box-body th { background: rgba(124,106,247,.15) !important; }
 </style>
 </head>
 <body>
@@ -451,7 +461,7 @@
   <!-- TOPBAR -->
   <div id="topbar">
     <div id="menuBtn" onclick="openDrawer()">☰</div>
-    <div class="logo">Study<span>OS</span> <span style="font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">v3</span></div>
+    <div class="logo">Study<span>OS</span></div>
     <div id="topSubject">Sin materia</div>
     <div id="addSubjectBtn" onclick="openAddModal()">+</div>
     <div id="keyBtn" onclick="openModal('keyModal')" title="API Key" style="width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;">⚙️</div>
@@ -720,7 +730,7 @@ function tabMaterial(s, c) {
   const daysLeft = s.examDate ? Math.ceil((new Date(s.examDate)-new Date())/86400000) : null;
   c.innerHTML = `
     <div class="section-title">Subí tu material</div>
-    <div class="section-sub">PDF · el texto se extrae automáticamente</div>
+    <div class="section-sub">Documentos, imágenes y grabaciones de clase</div>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
 
