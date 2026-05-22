@@ -365,7 +365,7 @@ async function GM(){
   const tf=s.files.filter(f=>f.txt&&f.txt.length>5);
   if(!tf.length){document.getElementById("MO").innerHTML="<div class=\"err\">❌ Los archivos no tienen texto extraible. Verificá que el PDF no sea imagen escaneada.</div>";return}
   document.getElementById("MO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Analizando ${tf.length} archivo${tf.length>1?"s":""}...</p></div>`;
-  const txt=tf.map(f=>"\n=== "+f.name+" ===\n"+f.txt).join("\n");
+  const txt=tf.map(f=>"\n=== "+f.name+" ===\n"+f.txt).join("\n").substring(0,20000);
   try{
     const p=`Sos asistente académico UDELAR Uruguay. Analizá DETALLADAMENTE el material de "${s.name}" y creá un MANUAL DE ESTUDIO COMPLETO en español.
 
@@ -383,7 +383,7 @@ Usá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> lista
 
 MATERIAL:
 ${txt}`;
-    const html=await AI(p,3500);
+    const html=await AI(p,6000);
     s.man=html;SV();
     document.getElementById("MO").innerHTML=`<div class="abox"><div class="abh"><span>✦ Manual — ${s.name}</span><button onclick="CP()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${html}</div></div>`;
   }catch(e){document.getElementById("MO").innerHTML=`<div class="err">❌ ${e.message}</div>`}
@@ -429,7 +429,7 @@ async function GF(){
 [{"q":"pregunta concisa","a":"respuesta 1-3 oraciones"},...]
 
 MATERIAL:
-${txt.substring(0,10000)}`,2000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+${txt.substring(0,12000)}`,2500)).replace(/\`\`\`json|\`\`\`/g,"").trim();
     const st=raw.indexOf("["),en=raw.lastIndexOf("]");
     s.cards=JSON.parse(raw.substring(st,en+1));SV();
     document.getElementById("FO").innerHTML=FC(s);
