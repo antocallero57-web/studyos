@@ -243,7 +243,7 @@ function init(){
   if(!GK())setTimeout(()=>OM("km"),600);
 }
 function SV(){
-  try{localStorage.setItem("sos_v1",JSON.stringify(subs.map(s=>({...s,files:(s.files||[]).map(f=>({name:f.name,size:f.size,ok:!!(f.txt&&f.txt.length>5)}))}))));  }catch(e){}
+  try{localStorage.setItem("sos_v1",JSON.stringify(subs.map(s=>({...s,files:(s.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)}))}))));  }catch(e){console.warn("Storage lleno:",e)};
 }
 
 // ── DRAWER ──
@@ -372,7 +372,14 @@ async function GM(){
   const p2=base+`\n\nGENERÁ ÚNICAMENTE estas tres secciones (no agregues más):\n1. <h2>DESARROLLO</h2> — explicá cada tema en profundidad con subsecciones <h3>\n2. <h2>NORMATIVA</h2> — artículos, normas, condiciones y límites importantes\n3. <h2>PARA EL EXAMEN</h2> — puntos críticos, trampas frecuentes y lo que más entra`;
   try{
     const [h1,h2]=await Promise.all([AI(p1,4000),AI(p2,4000)]);
-    const html=h1+"\n"+h2;
+    const md2html=t=>t
+      .replace(/^#{1,2}\s+(.+)$/gm,(_,x)=>`<h2>${x}</h2>`)
+      .replace(/^#{3,4}\s+(.+)$/gm,(_,x)=>`<h3>${x}</h3>`)
+      .replace(/\*\*(.+?)\*\*/g,(_,x)=>`<strong>${x}</strong>`)
+      .replace(/^---+$/gm,"")
+      .replace(/^-\s+(.+)$/gm,(_,x)=>`<li>${x}</li>`)
+      .replace(/(<li>.*<\/li>\n?)+/g,m=>`<ul>${m}</ul>`);
+    const html=md2html(h1)+"\n"+md2html(h2);
     s.man=html;SV();
     mo.innerHTML=`<div class="abox"><div class="abh"><span>✦ Manual — ${s.name}</span><button onclick="CP()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${html}</div></div>`;
   }catch(e){mo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
