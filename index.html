@@ -579,7 +579,8 @@ function checkKey() {
   if (!getKey()) { openModal('keyModal'); return false; }
   return true;
 }
-async function gemini(prompt, maxTokens=2000) {
+// gemini replaced by askClaude
+async function _unused_gemini(prompt, maxTokens=2000) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST',
     headers:{
@@ -887,7 +888,7 @@ function handleAudioFiles(fl) {
       const mimeType = f.type || 'audio/mpeg';
 
       try {
-        const transcription = await gemini(`Sos asistente académico. Tenés una grabación de clase "${f.name}" de la materia "${s.name}". Generá una plantilla de NOTAS DE CLASE estructurada para completar mientras se escucha el audio. Incluí: secciones típicas de la materia, preguntas guía, espacio para conceptos clave y fórmulas importantes. Texto plano, conciso.`, 1500);
+        const transcription = await askClaude(`Sos asistente académico. Tenés una grabación de clase "${f.name}" de la materia "${s.name}". Generá una plantilla de NOTAS DE CLASE estructurada para completar mientras se escucha el audio. Incluí: secciones típicas de la materia, preguntas guía, espacio para conceptos clave y fórmulas importantes. Texto plano, conciso.`, 1500);
 
         s.files.push({
           name: f.name,
@@ -954,7 +955,7 @@ BASATE ÚNICAMENTE en el material. Usá HTML: <h2> secciones, <h3> subsecciones,
 
 MATERIAL:
 ${text}`;
-    const html = await gemini(prompt, 2000);
+    const html = await askClaude(prompt, 2000);
     s.manualContent = html;
     save();
     document.getElementById('manualOut').innerHTML = `<div class="ai-box"><div class="ai-box-head"><span>✦ Manual</span><button onclick="copyManual()" style="background:none;border:1px solid var(--border);border-radius:7px;padding:5px 10px;color:var(--text2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="ai-box-body">${html}</div></div>`;
@@ -1024,7 +1025,7 @@ async function genFlash() {
   const text = textFiles2.map(f=>f.content).join('\n\n');
   try {
     const prompt = `Materia "${s.name}" UDELAR Economía Uruguay. Creá exactamente 16 flashcards de estudio. Devolvé ÚNICAMENTE un array JSON válido, sin texto antes ni después, sin backticks, sin markdown: [{"q":"pregunta concisa","a":"respuesta de 1 a 3 oraciones"},{"q":"...","a":"..."}]. MATERIAL: ${text.substring(0,8000)||s.name}`;
-    const raw = (await gemini(prompt, 2000)).replace(/\`\`\`json|\`\`\`/g,'').trim();
+    const raw = (await askClaude(prompt, 2000)).replace(/\`\`\`json|\`\`\`/g,'').trim();
     const start = raw.indexOf('[');
     const end = raw.lastIndexOf(']');
     s.flashcards = JSON.parse(raw.substring(start, end+1));
@@ -1113,7 +1114,7 @@ async function checkOpen(qi) {
   const cont = document.getElementById('oc-'+qi);
   if (cont) cont.innerHTML = `<div class="loading-box" style="padding:16px"><div class="spinner"></div></div>`;
   try {
-    const fb = await gemini(`Docente UDELAR Economía. Evaluá brevemente (2-3 oraciones) esta respuesta, sé preciso y alentador. Pregunta: ${s.quiz[qi].question} — Respuesta esperada: ${s.quiz[qi].answer} — Respuesta del estudiante: ${text} — Solo el feedback, sin encabezados.`, 300);
+    const fb = await askClaude(`Docente UDELAR Economía. Evaluá brevemente (2-3 oraciones) esta respuesta, sé preciso y alentador. Pregunta: ${s.quiz[qi].question} — Respuesta esperada: ${s.quiz[qi].answer} — Respuesta del estudiante: ${text} — Solo el feedback, sin encabezados.`, 300);
     if (cont) cont.innerHTML = `<div class="quiz-exp show" style="margin-top:8px">🤖 ${fb}</div>`;
     if (ta) ta.disabled = true;
   } catch(e) {
