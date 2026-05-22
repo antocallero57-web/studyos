@@ -1118,7 +1118,7 @@ async function genQuiz() {
   if(!textFiles3.length){document.getElementById('quizOut').innerHTML='<div style="color:var(--red);padding:14px;background:var(--surface);border-radius:12px;border:1px solid var(--border)">❌ Sin texto extraible aun.</div>';return;}
   const text = textFiles3.map(f=>f.content).join('\n\n');
   try {
-    const rawQ = (await gemini(`Sos docente de la Facultad de Economía UDELAR Uruguay. Generá un cuestionario para "${s.name}" con exactamente 10 preguntas. Devolvé ÚNICAMENTE JSON válido, sin texto extra, sin backticks: [{"type":"mc","question":"texto","options":["A","B","C","D"],"correct":0,"explanation":"por qué A es correcta"},{"type":"open","question":"texto","answer":"respuesta completa esperada"}]. 6 preguntas mc + 4 preguntas open. Dificultad media-alta estilo examen real UDELAR. MATERIAL: ${text.substring(0,8000)||s.name}`, 2500)).replace(/\`\`\`json|\`\`\`/g,'').trim();
+    const rawQ = (await askClaude(`Sos docente UDELAR. Para "${s.name}", generá 6 preguntas de examen basándote en el material. Devolvé SOLO el JSON puro, empezando con [ y terminando con ], sin texto antes ni después: [{"type":"mc","question":"pregunta","options":["A","B","C","D"],"correct":0,"explanation":"explicacion"},{"type":"open","question":"pregunta","answer":"respuesta"}]. 4 mc + 2 open.\n\nMATERIAL:\n${text.substring(0,8000)}`, 2000)).replace(/\`\`\`json|\`\`\`/g,'').trim();
     const startQ = rawQ.indexOf('['); const endQ = rawQ.lastIndexOf(']');
     s.quiz = JSON.parse(rawQ.substring(startQ, endQ+1));
     save();
