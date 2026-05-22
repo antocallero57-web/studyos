@@ -451,7 +451,7 @@
   <!-- TOPBAR -->
   <div id="topbar">
     <div id="menuBtn" onclick="openDrawer()">☰</div>
-    <div class="logo">Study<span>OS</span></div>
+    <div class="logo">Study<span>OS</span> <span style="font-size:10px;color:var(--text2);font-family:'DM Mono',monospace">v3</span></div>
     <div id="topSubject">Sin materia</div>
     <div id="addSubjectBtn" onclick="openAddModal()">+</div>
     <div id="keyBtn" onclick="openModal('keyModal')" title="API Key" style="width:38px;height:38px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;flex-shrink:0;">⚙️</div>
@@ -720,7 +720,7 @@ function tabMaterial(s, c) {
   const daysLeft = s.examDate ? Math.ceil((new Date(s.examDate)-new Date())/86400000) : null;
   c.innerHTML = `
     <div class="section-title">Subí tu material</div>
-    <div class="section-sub">Documentos, imágenes y grabaciones de clase</div>
+    <div class="section-sub">PDF · el texto se extrae automáticamente</div>
 
     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">
 
