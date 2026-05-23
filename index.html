@@ -262,7 +262,7 @@ function SV(){
   try{
     const data=subs.map(s=>({...s,plan:s.plan||null,
       folders:(s.folders||[]).map(fo=>({...fo,
-        files:(fo.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)}))
+        files:(fo.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)})),mapa:fo.mapa||null,esquema:fo.esquema||null
       }))
     }));
     localStorage.setItem("sos_v1",JSON.stringify(data));
@@ -361,6 +361,8 @@ function openFolder(fid){
       <div class="tab" id="t-man" onclick="ST2('man')">📖 Manual IA</div>
       <div class="tab" id="t-fla" onclick="ST2('fla')">🃏 Tarjetas</div>
       <div class="tab" id="t-qui" onclick="ST2('qui')">🧠 Cuestionario</div>
+      <div class="tab" id="t-map" onclick="ST2('map')">🗺️ Mapa Mental</div>
+      <div class="tab" id="t-esq" onclick="ST2('esq')">🔗 Esquema</div>
     </div>
     <div id="tc"></div>`;
   TAB2("mat");
@@ -372,6 +374,8 @@ function TAB2(t){
   else if(t==="man")TN2(fo,c);
   else if(t==="fla")TF2(fo,c);
   else if(t==="qui")TQ2(fo,c);
+  else if(t==="map")TMAP(fo,c);
+  else if(t==="esq")TESQ(fo,c);
 }
 function ST2(t){
   document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));
@@ -454,7 +458,7 @@ function TF2(fo,c){
   const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
   c.innerHTML=`
     <div class="tt">🃏 Tarjetas de Memoria</div>
-    <div class="ts">Tocá la tarjeta para ver la respuesta.</div>
+    <div class="ts">50 tarjetas · Tocá para ver la respuesta.</div>
     <button class="btn" onclick="GF3()" ${!ok?"disabled":""}>✦ ${fo.cards&&fo.cards.length?"Regenerar":"Generar"} Tarjetas</button>
     <div id="FO" style="margin-top:14px">${fo.cards&&fo.cards.length?FC2(fo):""}</div>`;
 }
@@ -483,9 +487,14 @@ async function GF3(){
   document.getElementById("FO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Creando tarjetas...</p></div>`;
   const txt=tf.map(f=>f.txt).join("\n\n");
   try{
-    const raw=(await AI(`Materia "${fo.name}" UDELAR. Creá 16 flashcards. SOLO array JSON sin backticks:\n[{"q":"pregunta","a":"respuesta"},...]\n\nMATERIAL:\n${txt.substring(0,12000)}`,2500)).replace(/\`\`\`json|\`\`\`/g,"").trim();
-    const st=raw.indexOf("["),en=raw.lastIndexOf("]");
-    fo.cards=JSON.parse(raw.substring(st,en+1));SV();
+    const base50=`Materia "${fo.name}" UDELAR. SOLO array JSON sin texto extra ni backticks: [{"q":"pregunta concisa","a":"respuesta 1-3 oraciones"},...]\n\nMATERIAL:\n${txt.substring(0,12000)}`;
+    const [r50a,r50b,r50c]=await Promise.all([
+      AI(base50+`\n\nCreá exactamente 17 flashcards sobre los PRIMEROS conceptos del material. Empezá desde el concepto 1.`,2000),
+      AI(base50+`\n\nCreá exactamente 17 flashcards sobre los CONCEPTOS DEL MEDIO del material. No repitas las primeras.`,2000),
+      AI(base50+`\n\nCreá exactamente 16 flashcards sobre los ÚLTIMOS conceptos y normativa del material. No repitas anteriores.`,2000)
+    ]);
+    const parse50=r=>{const x=r.replace(/\`\`\`json|\`\`\`/g,"").trim();return JSON.parse(x.substring(x.indexOf("["),x.lastIndexOf("]")+1))};
+    fo.cards=[...parse50(r50a),...parse50(r50b),...parse50(r50c)];SV();
     document.getElementById("FO").innerHTML=FC2(fo);
   }catch(e){document.getElementById("FO").innerHTML=`<div class="err">❌ ${e.message}</div>`}
 }
@@ -735,6 +744,109 @@ async function GQ(){
   }catch(e){qo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
 }
 function RQ(){qa={};document.getElementById("QO").innerHTML=QC(G())}
+
+// ── TAB MAPA MENTAL ──
+function TMAP(fo,c){
+  const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
+  c.innerHTML=`
+    <div class="tt">🗺️ Mapa Mental</div>
+    <div class="ts">Visualización de conceptos y sus relaciones.</div>
+    ${fo.mapa?`<button class="btn2" onclick="GMAP()" style="margin-bottom:10px">↻ Regenerar</button>`:""}
+    <button class="btn" onclick="GMAP()" ${!ok?"disabled":""}>✦ ${fo.mapa?"Actualizar":"Generar"} Mapa Mental</button>
+    ${!ok?`<p style="font-size:12px;color:var(--t2);text-align:center;margin-top:4px">Subí material primero.</p>`:""}
+    <div id="MAPO" style="margin-top:14px">${fo.mapa?renderMapa(fo.mapa):""}</div>`;
+}
+function renderMapa(data){
+  const colors=["#7c6af7","#4dd0c4","#f5c842","#56d67b","#f06292","#ff8a65","#90caf9","#ce93d8"];
+  return`<div style="background:var(--s);border:1px solid var(--b);border-radius:14px;padding:16px;overflow-x:auto">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="display:inline-block;background:linear-gradient(135deg,var(--a),#9c88ff);color:#fff;padding:12px 20px;border-radius:12px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700">${data.centro}</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center">
+      ${data.ramas.map((r,i)=>`
+        <div style="background:${colors[i%colors.length]}18;border:2px solid ${colors[i%colors.length]};border-radius:12px;padding:12px;min-width:140px;max-width:200px">
+          <div style="font-weight:700;font-size:13px;color:${colors[i%colors.length]};margin-bottom:8px">📌 ${r.titulo}</div>
+          <ul style="margin:0;padding-left:14px;list-style:none">
+            ${r.conceptos.map(x=>`<li style="font-size:12px;color:var(--t);margin-bottom:4px;padding-left:8px;border-left:2px solid ${colors[i%colors.length]}40">• ${x}</li>`).join("")}
+          </ul>
+        </div>`).join("")}
+    </div>
+  </div>`;
+}
+async function GMAP(){
+  if(!CK())return;const fo=GF2();if(!fo)return;
+  const tf=fo.files.filter(f=>f.txt&&f.txt.length>5);
+  if(!tf.length)return;
+  const mapo=document.getElementById("MAPO");
+  mapo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando mapa mental...</p></div>`;
+  const txt=tf.map(f=>f.txt).join("
+
+").substring(0,15000);
+  try{
+    const raw=(await AI(`Analizá este material de "${fo.name}" y creá un mapa mental. Devolvé SOLO JSON sin backticks:
+{"centro":"${fo.name}","ramas":[{"titulo":"Rama 1","conceptos":["concepto1","concepto2","concepto3"]},{"titulo":"Rama 2","conceptos":["..."]},...]}
+Máximo 8 ramas, 4-6 conceptos por rama. Conceptos cortos (max 6 palabras).
+
+MATERIAL:
+${txt}`,2000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const st=raw.indexOf("{"),en=raw.lastIndexOf("}");
+    fo.mapa=JSON.parse(raw.substring(st,en+1));SV();
+    mapo.innerHTML=renderMapa(fo.mapa);
+  }catch(e){mapo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
+
+// ── TAB ESQUEMA CONCEPTUAL ──
+function TESQ(fo,c){
+  const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
+  c.innerHTML=`
+    <div class="tt">🔗 Esquema Conceptual</div>
+    <div class="ts">Jerarquía de conceptos con relaciones y definiciones.</div>
+    ${fo.esquema?`<button class="btn2" onclick="GESQ()" style="margin-bottom:10px">↻ Regenerar</button>`:""}
+    <button class="btn" onclick="GESQ()" ${!ok?"disabled":""}>✦ ${fo.esquema?"Actualizar":"Generar"} Esquema</button>
+    ${!ok?`<p style="font-size:12px;color:var(--t2);text-align:center;margin-top:4px">Subí material primero.</p>`:""}
+    <div id="ESQO" style="margin-top:14px">${fo.esquema?renderEsq(fo.esquema):""}</div>`;
+}
+function renderEsq(data){
+  return`<div style="background:var(--s);border:1px solid var(--b);border-radius:14px;padding:16px">
+    ${data.map(bloque=>`
+      <div style="margin-bottom:16px">
+        <div style="background:linear-gradient(135deg,rgba(124,106,247,.2),rgba(77,208,196,.1));border:1px solid var(--a);border-radius:10px;padding:11px 14px;margin-bottom:8px">
+          <div style="font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--a)">${bloque.concepto}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:3px;line-height:1.5">${bloque.definicion}</div>
+        </div>
+        ${bloque.subcategorias&&bloque.subcategorias.length?`
+        <div style="padding-left:16px;border-left:2px solid rgba(124,106,247,.3)">
+          ${bloque.subcategorias.map(sub=>`
+            <div style="background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:9px 12px;margin-bottom:6px">
+              <div style="font-size:13px;font-weight:600;color:var(--a3)">↳ ${sub.nombre}</div>
+              <div style="font-size:12px;color:var(--t2);margin-top:2px;line-height:1.5">${sub.detalle}</div>
+              ${sub.items&&sub.items.length?`<ul style="margin:6px 0 0;padding-left:16px">${sub.items.map(it=>`<li style="font-size:11px;color:var(--t);margin-bottom:2px">${it}</li>`).join("")}</ul>`:""}
+            </div>`).join("")}
+        </div>`:""}
+      </div>`).join("")}
+  </div>`;
+}
+async function GESQ(){
+  if(!CK())return;const fo=GF2();if(!fo)return;
+  const tf=fo.files.filter(f=>f.txt&&f.txt.length>5);
+  if(!tf.length)return;
+  const esqo=document.getElementById("ESQO");
+  esqo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando esquema conceptual...</p></div>`;
+  const txt=tf.map(f=>f.txt).join("
+
+").substring(0,15000);
+  try{
+    const raw=(await AI(`Analizá este material de "${fo.name}" y creá un esquema conceptual jerárquico. Devolvé SOLO JSON sin backticks:
+[{"concepto":"Concepto Principal","definicion":"definición clara y concisa","subcategorias":[{"nombre":"Subcategoría","detalle":"explicación","items":["item1","item2"]}]}]
+Máximo 6 conceptos principales, 3-4 subcategorías por concepto, 3-5 items por subcategoría. Sé específico con el material.
+
+MATERIAL:
+${txt}`,3000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const st=raw.indexOf("["),en=raw.lastIndexOf("]");
+    fo.esquema=JSON.parse(raw.substring(st,en+1));SV();
+    esqo.innerHTML=renderEsq(fo.esquema);
+  }catch(e){esqo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
 
 // ── TAB PLAN DE ESTUDIO ──
 function TP(s,c){
