@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>StudyOS</title>
+<meta name="application-name" content="StudyOS">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StudyOS">
+<meta name="theme-color" content="#0a0a0f">
+<meta name="description" content="Tu asistente de estudio con IA">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -170,6 +178,14 @@ body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(
     <button class="btn" onclick="SD()">Guardar</button>
   </div>
 </div>
+<div class="mbd" id="fm" onclick="if(event.target===this)CM('fm')">
+  <div class="modal"><div class="mh"></div><h2>📁 Nueva Carpeta</h2>
+    <label class="fl">Nombre del tema</label>
+    <input class="fi" id="fn" placeholder="Ej: Conjuntos Económicos">
+    <button class="btn" onclick="addFolder()">✦ Crear Carpeta</button>
+    <button class="btn2" onclick="CM('fm')">Cancelar</button>
+  </div>
+</div>
 <div class="mbd" id="km" onclick="if(event.target===this)CM('km')">
   <div class="modal"><div class="mh"></div><h2>🔑 Configurar IA</h2>
     <p style="font-size:13px;color:var(--t2);margin-bottom:14px;line-height:1.6">Pegá tu API Key de Anthropic para activar el manual, tarjetas y cuestionario.</p>
@@ -243,7 +259,14 @@ function init(){
   if(!GK())setTimeout(()=>OM("km"),600);
 }
 function SV(){
-  try{localStorage.setItem("sos_v1",JSON.stringify(subs.map(s=>({...s,files:(s.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)}))}))));  }catch(e){console.warn("Storage lleno:",e)};
+  try{
+    const data=subs.map(s=>({...s,
+      folders:(s.folders||[]).map(fo=>({...fo,
+        files:(fo.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)}))
+      }))
+    }));
+    localStorage.setItem("sos_v1",JSON.stringify(data));
+  }catch(e){console.warn("Storage lleno:",e)}
 }
 
 // ── DRAWER ──
@@ -258,14 +281,14 @@ function PC(c){col=c;CR()}
 function AS(){
   const n=document.getElementById("mn").value.trim();
   if(!n){document.getElementById("mn").focus();return}
-  const s={id:Date.now()+"",name:n,date:document.getElementById("md").value,color:col,files:[],man:"",cards:[],quiz:[]};
+  const s={id:Date.now()+"",name:n,date:document.getElementById("md").value,color:col,folders:[],man:"",cards:[],quiz:[]};
   subs.push(s);SV();CM("am");document.getElementById("mn").value="";
   RL();SEL(s.id);
 }
 function RL(){
   const el=document.getElementById("slist");
   if(!subs.length){el.innerHTML="<p style=\"padding:16px;font-size:13px;color:var(--t2)\">Sin materias.</p>";return}
-  el.innerHTML=subs.map(s=>`<div class="si ${s.id===aid?"active":""}" onclick="SEL('${s.id}');CD()"><div class="sdot" style="background:${s.color}"></div><div class="sn">${s.name}</div><div class="sf">${(s.files||[]).length}</div></div>`).join("");
+  el.innerHTML=subs.map(s=>`<div class="si ${s.id===aid?"active":""}" onclick="SEL('${s.id}');CD()"><div class="sdot" style="background:${s.color}"></div><div class="sn">${s.name}</div><div class="sf">${(s.folders||[]).length} 📁</div></div>`).join("");
 }
 function SEL(id){aid=id;qa={};fi=0;RL();const s=G();document.getElementById("topSub").textContent=s?s.name:"";SV2()}
 function G(){return subs.find(s=>s.id===aid)}
@@ -282,10 +305,7 @@ function SV2(){
       <div class="eb" onclick="OM('dm')">${dlbl}</div>
     </div></div>
     <div id="tabs">
-      <div class="tab active" id="t-mat" onclick="ST('mat')">📂 Material</div>
-      <div class="tab" id="t-man" onclick="ST('man')">📖 Manual IA</div>
-      <div class="tab" id="t-fla" onclick="ST('fla')">🃏 Tarjetas</div>
-      <div class="tab" id="t-qui" onclick="ST('qui')">🧠 Cuestionario</div>
+      <div class="tab active" id="t-mat" onclick="ST('mat')">📁 Carpetas</div>
     </div>
     <div id="tc"></div>`;
   TAB("mat");
@@ -300,23 +320,239 @@ function TAB(t){
   const c=document.getElementById("tc");if(!c)return;const s=G();
   if(t==="mat")TM(s,c);else if(t==="man")TN(s,c);else if(t==="fla")TF(s,c);else if(t==="qui")TQ(s,c);
 }
-
-// ── TAB MATERIAL ──
-function TM(s,c){
+// ── CARPETAS ──
+let acf=null; // carpeta activa id
+function GF2(){return G()?(G().folders||[]).find(f=>f.id===acf):null}
+function addFolder(){
+  const n=document.getElementById("fn").value.trim();
+  if(!n)return;
+  const s=G();if(!s)return;
+  if(!s.folders)s.folders=[];
+  s.folders.push({id:Date.now()+"",name:n,files:[],man:"",cards:[],quiz:[]});
+  SV();CM("fm");document.getElementById("fn").value="";
+  TM(s,document.getElementById("tc"));
+}
+function openFolder(fid){
+  acf=fid;
+  const s=G();const fo=s.folders.find(f=>f.id===fid);
+  const m=document.getElementById("main");
   const dl=s.date?Math.ceil((new Date(s.date)-new Date())/86400000):null;
+  const dlbl=s.date?`📅 ${new Date(s.date+"T12:00").toLocaleDateString("es-UY",{day:"numeric",month:"short"})} · ${dl>=0?dl+" días":"Pasado"}`:"📅 Fecha";
+  m.innerHTML=`
+    <div id="sh"><div class="sh-top">
+      <div class="sh-name">
+        <span onclick="acf=null;SV2()" style="cursor:pointer;color:var(--t2);font-size:14px">← ${s.name}</span>
+        <span style="color:var(--t2);margin:0 6px">/</span>
+        <div class="sh-dot" style="background:${s.color}"></div>${fo.name}
+      </div>
+      <div class="eb" onclick="OM('dm')">${dlbl}</div>
+    </div></div>
+    <div id="tabs">
+      <div class="tab active" id="t-mat" onclick="ST('mat')">📂 Archivos</div>
+      <div class="tab" id="t-man" onclick="ST('man')">📖 Manual IA</div>
+      <div class="tab" id="t-fla" onclick="ST('fla')">🃏 Tarjetas</div>
+      <div class="tab" id="t-qui" onclick="ST('qui')">🧠 Cuestionario</div>
+    </div>
+    <div id="tc"></div>`;
+  TAB2("mat");
+}
+function TAB2(t){
+  const c=document.getElementById("tc");if(!c)return;
+  const fo=GF2();if(!fo)return;
+  if(t==="mat")TM2(fo,c);
+  else if(t==="man")TN2(fo,c);
+  else if(t==="fla")TF2(fo,c);
+  else if(t==="qui")TQ2(fo,c);
+}
+function ST2(t){
+  document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));
+  const e=document.getElementById("t-"+t);
+  if(e){e.classList.add("active");e.scrollIntoView({behavior:"smooth",block:"nearest",inline:"center"})}
+  TAB2(t);
+}
+function delFolder(fid,e){
+  e.stopPropagation();
+  if(!confirm("¿Eliminar esta carpeta y todo su contenido?"))return;
+  const s=G();s.folders=s.folders.filter(f=>f.id!==fid);SV();
+  TM(s,document.getElementById("tc"));
+}
+// Material de carpeta
+function TM2(fo,c){
   c.innerHTML=`
-    <div class="tt">Subí tu material</div>
+    <div class="tt">📄 Archivos de esta carpeta</div>
     <div class="ts">PDF · el texto se extrae automáticamente</div>
     <div class="uwrap">
-      <input type="file" multiple accept=".pdf,.txt,.doc,.docx,.png,.jpg,.jpeg" onchange="HF(this.files)">
+      <input type="file" multiple accept=".pdf,.txt" onchange="HF2(this.files)">
       <div class="ulbl"><span style="font-size:24px">📄</span>
         <div><div style="font-size:15px;font-weight:600">Agregar archivos</div>
-        <div style="font-size:12px;opacity:.65;margin-top:2px">PDF · Word · TXT · Imágenes</div></div>
+        <div style="font-size:12px;opacity:.65;margin-top:2px">PDF · TXT</div></div>
       </div>
     </div>
-    <div id="FL"></div>
-    ${dl!==null?BP(dl):"<div style=\"background:var(--s);border:1px solid var(--b);border-radius:12px;padding:14px;color:var(--t2);font-size:13px;text-align:center\">⏰ Configurá la fecha del examen para ver el plan.</div>"}`;
-  RF(s);
+    <div id="FL2"></div>`;
+  RF2(fo);
+}
+function RF2(fo){
+  const el=document.getElementById("FL2");if(!el)return;
+  if(!fo.files||!fo.files.length){el.innerHTML="";return}
+  el.innerHTML=`<div class="flist">${fo.files.map((f,i)=>`<div class="fc ${f.rd?"rd":""}"><span>${FI(f.name)}</span><span class="fcn">${f.name}${f.txt&&f.txt.length>5?' <span style="color:var(--g);font-size:11px">✓</span>':f.rd?' <span style="color:var(--a);font-size:11px">leyendo...</span>':""}</span><span class="frm" onclick="RM2(${i})">✕</span></div>`).join("")}</div>`;
+}
+function RM2(i){const fo=GF2();fo.files.splice(i,1);SV();RF2(fo)}
+async function HF2(fl){
+  const fo=GF2();if(!fo)return;if(!fo.files)fo.files=[];
+  for(const f of Array.from(fl)){
+    const obj={name:f.name,size:f.size,txt:"",rd:true};
+    fo.files.push(obj);SV();RF2(fo);
+    try{
+      if(f.name.toLowerCase().endsWith(".pdf"))obj.txt=await PDF(f);
+      else obj.txt=await new Promise((r,j)=>{const rd=new FileReader();rd.onload=e=>r(e.target.result.substring(0,25000));rd.onerror=j;rd.readAsText(f)});
+    }catch(e){obj.txt="[Error: "+e.message+"]"}
+    obj.rd=false;SV();RF2(fo);
+  }
+  document.querySelectorAll(".uwrap input[type=file]").forEach(i=>i.value="");
+}
+// Manual de carpeta
+function TN2(fo,c){
+  const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
+  c.innerHTML=`
+    <div class="tt">📖 Manual Inteligente</div>
+    <div class="ts">Resumen detallado de esta carpeta.</div>
+    ${fo.man?`<button class="btn2" onclick="GM2()">↻ Regenerar</button>`:""}
+    <button class="btn" onclick="GM2()" ${!ok?"disabled":""}>✦ ${fo.man?"Actualizar":"Generar"} Manual</button>
+    ${!ok?"<p style=\"font-size:12px;color:var(--t2);text-align:center;margin-top:4px\">Subí material primero.</p>":""}
+    <div id="MO">${fo.man?`<div class="abox"><div class="abh"><span>✦ Manual — ${fo.name}</span><button onclick="CP2()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${fo.man}</div></div>`:""}</div>`;
+}
+async function GM2(){
+  if(!CK())return;const fo=GF2();if(!fo)return;
+  const tf=fo.files.filter(f=>f.txt&&f.txt.length>5);
+  if(!tf.length){document.getElementById("MO").innerHTML="<div class=\"err\">❌ Sin texto extraible.</div>";return}
+  const mo=document.getElementById("MO");
+  mo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Parte 1/2: Resumen y conceptos...</p></div>`;
+  const txt=tf.map(f=>"\n=== "+f.name+" ===\n"+f.txt).join("\n").substring(0,20000);
+  const base=`Sos asistente académico UDELAR Uruguay. Basate ÚNICAMENTE en este material de "${fo.name}".\nUsá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> listas, <div class="definition"> para definiciones. Sin Markdown. Sé MUY DETALLADO.\n\nMATERIAL:\n${txt}`;
+  const p1=base+`\n\nGENERÁ ÚNICAMENTE estas dos secciones:\n1. <h2>RESUMEN EJECUTIVO</h2>\n2. <h2>CONCEPTOS CLAVE</h2> — todos con definición completa`;
+  const p2=base+`\n\nGENERÁ ÚNICAMENTE estas tres secciones:\n1. <h2>DESARROLLO</h2>\n2. <h2>NORMATIVA</h2>\n3. <h2>PARA EL EXAMEN</h2>`;
+  try{
+    const [h1,h2]=await Promise.all([AI(p1,4000),AI(p2,4000)]);
+    const md2html=t=>t.replace(/^#{1,2}\s+(.+)$/gm,(_,x)=>`<h2>${x}</h2>`).replace(/^#{3,4}\s+(.+)$/gm,(_,x)=>`<h3>${x}</h3>`).replace(/\*\*(.+?)\*\*/g,(_,x)=>`<strong>${x}</strong>`).replace(/^---+$/gm,"").replace(/^-\s+(.+)$/gm,(_,x)=>`<li>${x}</li>`).replace(/(<li>.*<\/li>\n?)+/g,m=>`<ul>${m}</ul>`);
+    const html=md2html(h1)+"\n"+md2html(h2);
+    fo.man=html;SV();
+    mo.innerHTML=`<div class="abox"><div class="abh"><span>✦ Manual — ${fo.name}</span><button onclick="CP2()" style="background:none;border:1px solid var(--b);border-radius:7px;padding:4px 10px;color:var(--t2);font-size:12px;cursor:pointer">📋 Copiar</button></div><div class="abb">${html}</div></div>`;
+  }catch(e){mo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
+function CP2(){const fo=GF2();if(!fo||!fo.man)return;const d=document.createElement("div");d.innerHTML=fo.man;navigator.clipboard.writeText(d.textContent).catch(()=>{})}
+// Tarjetas de carpeta
+function TF2(fo,c){
+  const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
+  c.innerHTML=`
+    <div class="tt">🃏 Tarjetas de Memoria</div>
+    <div class="ts">Tocá la tarjeta para ver la respuesta.</div>
+    <button class="btn" onclick="GF3()" ${!ok?"disabled":""}>✦ ${fo.cards&&fo.cards.length?"Regenerar":"Generar"} Tarjetas</button>
+    <div id="FO" style="margin-top:14px">${fo.cards&&fo.cards.length?FC2(fo):""}</div>`;
+}
+function FC2(fo){
+  const c=fo.cards[fi],t=fo.cards.length;
+  return`<div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+    <div style="font-family:'DM Mono',monospace;font-size:12px;color:var(--t2)">${fi+1} / ${t}</div>
+    <div class="fcard" onclick="this.classList.toggle('fl')">
+      <div class="fci">
+        <div class="fcf"><div class="clbl">Pregunta ${fi+1}</div><div class="cq">${c.q}</div><div class="ch">🔄 Tocá para ver respuesta</div></div>
+        <div class="fcb"><div class="clbl">Respuesta</div><div class="ca">${c.a}</div></div>
+      </div>
+    </div>
+    <div class="fnav">
+      <button class="bnav" onclick="FP2()" ${fi===0?"disabled":""}>← Anterior</button>
+      <button class="bnav" onclick="FN2()" ${fi===t-1?"disabled":""}>Siguiente →</button>
+    </div>
+  </div>`;
+}
+function FP2(){if(fi>0){fi--;document.getElementById("FO").innerHTML=FC2(GF2())}}
+function FN2(){const fo=GF2();if(fi<fo.cards.length-1){fi++;document.getElementById("FO").innerHTML=FC2(fo)}}
+async function GF3(){
+  if(!CK())return;const fo=GF2();fi=0;
+  const tf=fo.files.filter(f=>f.txt&&f.txt.length>5);
+  if(!tf.length){alert("Subí material primero.");return}
+  document.getElementById("FO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Creando tarjetas...</p></div>`;
+  const txt=tf.map(f=>f.txt).join("\n\n");
+  try{
+    const raw=(await AI(`Materia "${fo.name}" UDELAR. Creá 16 flashcards. SOLO array JSON sin backticks:\n[{"q":"pregunta","a":"respuesta"},...]\n\nMATERIAL:\n${txt.substring(0,12000)}`,2500)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const st=raw.indexOf("["),en=raw.lastIndexOf("]");
+    fo.cards=JSON.parse(raw.substring(st,en+1));SV();
+    document.getElementById("FO").innerHTML=FC2(fo);
+  }catch(e){document.getElementById("FO").innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
+// Cuestionario de carpeta
+function TQ2(fo,c){
+  const has=fo.quiz&&fo.quiz.length>0;
+  const ok=fo.files&&fo.files.some(f=>f.txt&&f.txt.length>5);
+  c.innerHTML=`
+    <div class="tt">🧠 Cuestionario</div>
+    <div class="ts">25 preguntas: múltiple opción + desarrollo.</div>
+    ${has?`<div class="brow"><button class="btn2" onclick="RQ2()">↺ Reiniciar</button><button class="btn" onclick="GQ2()">↻ Nuevo</button></div>`:`<button class="btn" onclick="GQ2()" ${!ok?"disabled":""}>✦ Generar Cuestionario</button>`}
+    <div id="QO" style="margin-top:16px">${has?QC2(fo):""}</div>`;
+}
+function QC2(fo){
+  const an=Object.keys(qa).length,sc=Object.values(qa).filter(a=>a.ok).length,tot=fo.quiz.length;
+  let h="";
+  if(an===tot){const pt=Math.round(sc/tot*100);h+=`<div class="sb"><div class="sn2">${pt}%</div><div class="ss">${sc}/${tot} correctas ${pt>=80?"🏆":pt>=60?"👍":"📚"}</div></div>`}
+  fo.quiz.forEach((q,i)=>{
+    const a=qa[i];
+    if(q.type==="mc"){
+      h+=`<div class="qc"><div class="qn">Pregunta ${i+1} · Múltiple opción</div><div class="qq">${q.question}</div><div class="qopts">${q.options.map((o,j)=>{let cls="";if(a){if(j===q.correct)cls="ok";else if(j===a.sel)cls="ng";cls+=" ans";}return`<div class="qo ${cls}" onclick="AM2(${i},${j})"><div class="ol">${"ABCD"[j]}</div><div>${o}</div></div>`;}).join("")}</div>${a?`<div class="qex show">💡 ${q.explanation}</div>`:""}</div>`;
+    }else{
+      h+=`<div class="qc"><div class="qn">Pregunta ${i+1} · Abierta</div><div class="qq">${q.question}</div><textarea class="ota" id="oq${i}" placeholder="Escribí tu respuesta..." ${a?"disabled":""}>${a?a.txt:""}</textarea><div style="margin-top:10px">${a?`<div class="qex show">💡 ${q.answer}</div>`:`<button class="btn" style="font-size:13px;padding:10px" onclick="CO2(${i})">✦ Corregir</button>`}</div><div id="oc${i}"></div></div>`;
+    }
+  });
+  return h;
+}
+function AM2(i,j){const fo=GF2();if(qa[i])return;qa[i]={sel:j,ok:j===fo.quiz[i].correct};document.getElementById("QO").innerHTML=QC2(fo)}
+async function CO2(i){
+  if(!CK())return;const fo=GF2();
+  const ta=document.getElementById("oq"+i);const txt=ta?ta.value.trim():"";if(!txt)return;
+  qa[i]={txt,ok:true};const ct=document.getElementById("oc"+i);
+  if(ct)ct.innerHTML=`<div class="lbox" style="padding:12px"><div class="spin"></div></div>`;
+  try{
+    const fb=await AI(`Docente UDELAR. Evaluá brevemente (2-3 oraciones).\nPregunta: ${fo.quiz[i].question}\nEsperado: ${fo.quiz[i].answer}\nRespuesta: ${txt}`,300);
+    if(ct)ct.innerHTML=`<div class="qex show" style="margin-top:8px">🤖 ${fb}</div>`;
+    if(ta)ta.disabled=true;
+  }catch(e){if(ct)ct.innerHTML=`<div style="color:var(--r);font-size:12px;margin-top:8px">Error: ${e.message}</div>`}
+}
+async function GQ2(){
+  if(!CK())return;const fo=GF2();qa={};
+  const tf=fo.files.filter(f=>f.txt&&f.txt.length>5);
+  if(!tf.length){alert("Subí material primero.");return}
+  const qo=document.getElementById("QO");
+  qo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando 25 preguntas...</p></div>`;
+  const txt=tf.map(f=>f.txt).join("\n\n").substring(0,12000);
+  const base=`Sos docente UDELAR. Basate ÚNICAMENTE en este material de "${fo.name}". Devolvé SOLO array JSON empezando con [ terminando con ], sin backticks.\n\nMATERIAL:\n${txt}`;
+  const p1=base+`\n\nCreá exactamente 18 preguntas múltiple opción: [{"type":"mc","question":"...","options":["A","B","C","D"],"correct":0,"explanation":"..."},...]`;
+  const p2=base+`\n\nCreá exactamente 7 preguntas abiertas: [{"type":"open","question":"...","answer":"..."},...]`;
+  try{
+    const [r1,r2]=await Promise.all([AI(p1,4000),AI(p2,2000)]);
+    const parse=r=>{const s=r.replace(/\`\`\`json|\`\`\`/g,"").trim();return JSON.parse(s.substring(s.indexOf("["),s.lastIndexOf("]")+1))};
+    fo.quiz=[...parse(r1),...parse(r2)];SV();
+    qo.innerHTML=QC2(fo);
+  }catch(e){qo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
+function RQ2(){qa={};document.getElementById("QO").innerHTML=QC2(GF2())}
+
+// ── TAB MATERIAL (vista carpetas) ──
+function TM(s,c){
+  const fols=s.folders||[];
+  c.innerHTML=`
+    <div class="tt">📁 Carpetas de estudio</div>
+    <div class="ts">Organizá tu material por temas.</div>
+    <button class="btn" onclick="OM('fm')" style="margin-bottom:14px">+ Nueva Carpeta</button>
+    ${fols.length===0?`<div style="background:var(--s);border:1px solid var(--b);border-radius:12px;padding:24px;color:var(--t2);font-size:13px;text-align:center">Creá tu primera carpeta para empezar 📂</div>`:""}
+    <div id="FLIST">${fols.map(fo=>`
+      <div onclick="openFolder('${fo.id}')" style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--s2);border:1.5px solid var(--b);border-radius:12px;margin-bottom:10px;cursor:pointer">
+        <span style="font-size:26px">📁</span>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:600">${fo.name}</div>
+          <div style="font-size:12px;color:var(--t2);margin-top:2px">${(fo.files||[]).length} archivo${(fo.files||[]).length!==1?"s":""} · ${(fo.files||[]).filter(f=>f.ok).length} leídos</div>
+        </div>
+        <span onclick="delFolder('${fo.id}',event)" style="color:var(--t2);font-size:18px;padding:4px 8px">🗑</span>
+      </div>`).join("")}
+    </div>`;
 }
 function BP(d){
   if(d<=0)return`<div style="background:var(--s);border:1px solid var(--b);border-radius:12px;padding:14px;color:var(--r);font-size:13px">⚠️ El examen ya pasó.</div>`;
@@ -497,6 +733,13 @@ function CM(id){const el=document.getElementById(id);el.classList.remove("open")
 function SD(){const s=G();if(!s)return;s.date=document.getElementById("di").value;SV();CM("dm");SV2()}
 
 init();
+
+// ── SERVICE WORKER ──
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
 </script>
 </body>
 </html>
