@@ -260,7 +260,7 @@ function init(){
 }
 function SV(){
   try{
-    const data=subs.map(s=>({...s,
+    const data=subs.map(s=>({...s,plan:s.plan||null,
       folders:(s.folders||[]).map(fo=>({...fo,
         files:(fo.files||[]).map(f=>({name:f.name,size:f.size,txt:(f.txt||"").substring(0,25000),ok:!!(f.txt&&f.txt.length>5)}))
       }))
@@ -304,8 +304,20 @@ function SV2(){
       <div class="sh-name"><div class="sh-dot" style="background:${s.color}"></div>${s.name}</div>
       <div class="eb" onclick="OM('dm')">${dlbl}</div>
     </div></div>
+    <div id="stabs" style="display:flex;overflow-x:auto;padding:0 14px;border-bottom:1px solid var(--b);flex-shrink:0;scrollbar-width:none">
+      <div class="tab active" id="st-car" onclick="SST('car')">📁 Carpetas</div>
+      <div class="tab" id="st-pla" onclick="SST('pla')">📅 Plan de Estudio</div>
+    </div>
     <div id="tc" style="flex:1;overflow-y:auto;padding:16px 14px"></div>`;
-  TM(s,document.getElementById("tc"));
+  SST('car');
+}
+function SST(t){
+  document.querySelectorAll("#stabs .tab").forEach(e=>e.classList.remove("active"));
+  const e=document.getElementById("st-"+t);
+  if(e)e.classList.add("active");
+  const s=G();const c=document.getElementById("tc");
+  if(t==="car")TM(s,c);
+  else if(t==="pla")TP(s,c);
 }
 function ST(t){
   document.querySelectorAll(".tab").forEach(e=>e.classList.remove("active"));
@@ -723,6 +735,80 @@ async function GQ(){
   }catch(e){qo.innerHTML=`<div class="err">❌ ${e.message}</div>`}
 }
 function RQ(){qa={};document.getElementById("QO").innerHTML=QC(G())}
+
+// ── TAB PLAN DE ESTUDIO ──
+function TP(s,c){
+  if(!s.date){
+    c.innerHTML=`<div style="text-align:center;padding:40px 20px;color:var(--t2)"><div style="font-size:48px;margin-bottom:12px">📅</div><p style="font-size:14px">Configurá la fecha del examen para generar tu plan.</p><button class="btn" style="margin-top:16px;width:auto;padding:12px 24px" onclick="OM('dm')">Configurar fecha</button></div>`;
+    return;
+  }
+  const dl=Math.ceil((new Date(s.date)-new Date())/86400000);
+  if(dl<=0){c.innerHTML=`<div style="text-align:center;padding:40px;color:var(--r);font-size:14px">⚠️ El examen ya pasó.</div>`;return}
+  const folders=s.folders||[];
+  const hasMat=folders.some(f=>(f.files||[]).some(x=>x.ok));
+  c.innerHTML=`
+    <div class="tt">📅 Plan de Estudio</div>
+    <div class="ts">Plan diario personalizado hasta el examen.</div>
+    ${s.plan?`<button class="btn2" onclick="GP()" style="margin-bottom:10px">↻ Regenerar Plan</button>`:""}
+    <button class="btn" onclick="GP()" ${!hasMat?"disabled":""}>✦ ${s.plan?"Actualizar":"Generar"} Plan</button>
+    ${!hasMat?`<p style="font-size:12px;color:var(--t2);text-align:center;margin-top:4px">Subí material en las carpetas primero.</p>`:""}
+    <div id="PO" style="margin-top:14px">${s.plan?renderPlan(s.plan,s.date):""}`;
+}
+function renderPlan(plan,examDate){
+  const today=new Date();today.setHours(0,0,0,0);
+  return plan.map((d,i)=>{
+    const dayDate=new Date(today);dayDate.setDate(today.getDate()+i);
+    const isToday=i===0;
+    const isPast=dayDate<today;
+    const dateStr=dayDate.toLocaleDateString("es-UY",{weekday:"short",day:"numeric",month:"short"});
+    return`<div style="background:${isToday?"rgba(124,106,247,.15)":"var(--s2)"};border:1.5px solid ${isToday?"var(--a)":"var(--b)"};border-radius:12px;padding:14px;margin-bottom:10px;opacity:${isPast?".5":"1"}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div style="font-family:'DM Mono',monospace;font-size:11px;color:${isToday?"var(--a)":"var(--t2)"};text-transform:uppercase;letter-spacing:1px">${isToday?"📍 HOY · ":""}${dateStr}</div>
+        <div style="font-size:11px;background:${isToday?"var(--a)":"var(--b)"};color:${isToday?"#fff":"var(--t2)"};padding:3px 8px;border-radius:20px">${d.tiempo}</div>
+      </div>
+      <div style="font-size:14px;font-weight:600;margin-bottom:4px">${d.tema}</div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.5">${d.tarea}</div>
+      ${d.tip?`<div style="margin-top:8px;font-size:12px;color:var(--a3)">💡 ${d.tip}</div>`:""}
+    </div>`;
+  }).join("");
+}
+async function GP(){
+  if(!CK())return;const s=G();if(!s||!s.date)return;
+  const dl=Math.ceil((new Date(s.date)-new Date())/86400000);
+  const po=document.getElementById("PO");
+  po.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando tu plan personalizado...</p></div>`;
+  const folders=(s.folders||[]).map(f=>({
+    nombre:f.name,
+    archivos:(f.files||[]).filter(x=>x.ok).length,
+    tieneManual:!!f.man,
+    tieneTarjetas:!!(f.cards&&f.cards.length),
+    tieneQuiz:!!(f.quiz&&f.quiz.length)
+  }));
+  const prompt=`Sos un coach de estudio experto. Creá un plan de estudio día a día para la materia "${s.name}".
+
+DATOS:
+- Días hasta el examen: ${dl}
+- Carpetas/temas: ${JSON.stringify(folders)}
+
+REGLAS:
+- Generá exactamente ${Math.min(dl,60)} días
+- Distribuí los temas de forma inteligente: primero aprender, luego practicar, al final repasar
+- Cada día indicá: tema concreto, tarea específica (leer, hacer tarjetas, cuestionario, repasar), tiempo estimado
+- Los últimos 3-5 días siempre son repaso general
+- Sé muy específico: "Leer carpeta X y generar manual IA" no "estudiar"
+- Incluí un tip motivacional corto cada 3-4 días
+
+Devolvé SOLO un array JSON sin backticks:
+[{"tema":"nombre del tema","tarea":"qué hacer exactamente","tiempo":"Xhs","tip":"tip opcional o null"},...]
+
+Exactamente ${Math.min(dl,60)} objetos.`;
+  try{
+    const raw=(await AI(prompt,4000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const st=raw.indexOf("["),en=raw.lastIndexOf("]");
+    s.plan=JSON.parse(raw.substring(st,en+1));SV();
+    po.innerHTML=renderPlan(s.plan,s.date);
+  }catch(e){po.innerHTML=`<div class="err">❌ ${e.message}</div>`}
+}
 
 // ── MODALS ──
 function OM(id){const el=document.getElementById(id);el.style.display="flex";setTimeout(()=>el.classList.add("open"),10)}
