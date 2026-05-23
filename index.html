@@ -4,14 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>StudyOS</title>
-<meta name="application-name" content="StudyOS">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="StudyOS">
 <meta name="theme-color" content="#0a0a0f">
 <meta name="description" content="Tu asistente de estudio con IA">
-<link rel="manifest" href="manifest.json">
-<link rel="apple-touch-icon" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Mono:wght@400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -143,7 +137,7 @@ body::before{content:"";position:fixed;inset:0;background-image:linear-gradient(
 <div id="app">
   <div id="bar">
     <div id="menuBtn" onclick="OD()">☰</div>
-    <div class="logo">Study<span>OS</span></div>
+    <div class="logo">Study<span>OS</span></div><div style="font-size:9px;color:var(--t2);font-family:monospace">v3.0</div>
     <div id="topSub">Sin materia</div>
     <div id="addBtn" onclick="OM('am')">+</div>
     <div id="keyBtn" onclick="OM('km')">⚙️</div>
@@ -441,7 +435,13 @@ async function GM2(){
   const mo=document.getElementById("MO");
   mo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Parte 1/2: Resumen y conceptos...</p></div>`;
   const txt=tf.map(f=>"\n=== "+f.name+" ===\n"+f.txt).join("\n").substring(0,20000);
-  const base=`Sos asistente académico UDELAR Uruguay. Basate ÚNICAMENTE en este material de "${fo.name}".\nUsá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> listas, <div class="definition"> para definiciones. Sin Markdown. Sé MUY DETALLADO.\n\nMATERIAL:\n${txt}`;
+  const isTranscript=txt.includes("¿")||txt.includes("está bien?")||txt.includes("¿correcto?")||txt.length>15000;
+  const base=`Sos asistente académico UDELAR Uruguay. Basate ÚNICAMENTE en este material de "${fo.name}".
+${isTranscript?"IMPORTANTE: Este material puede ser una transcripción de clase oral con lenguaje informal, anécdotas y conversación. Tu tarea es EXTRAER y ORDENAR los conceptos académicos importantes aunque estén enterrados en el texto coloquial. Ignorá el relleno y quedáte con la sustancia.":""}
+Usá HTML: <h2> secciones, <h3> subsecciones, <strong> términos, <ul><li> listas, <div class="definition"> para definiciones. Sin Markdown. Sé MUY DETALLADO.
+
+MATERIAL:
+\${txt}`;
   const p1=base+`\n\nGENERÁ ÚNICAMENTE estas dos secciones:\n1. <h2>RESUMEN EJECUTIVO</h2>\n2. <h2>CONCEPTOS CLAVE</h2> — todos con definición completa`;
   const p2=base+`\n\nGENERÁ ÚNICAMENTE estas tres secciones:\n1. <h2>DESARROLLO</h2>\n2. <h2>NORMATIVA</h2>\n3. <h2>PARA EL EXAMEN</h2>`;
   try{
@@ -849,7 +849,7 @@ function TP(s,c){
   const dl=Math.ceil((new Date(s.date)-new Date())/86400000);
   if(dl<=0){c.innerHTML=`<div style="text-align:center;padding:40px;color:var(--r);font-size:14px">⚠️ El examen ya pasó.</div>`;return}
   const folders=s.folders||[];
-  const hasMat=folders.some(f=>(f.files||[]).some(x=>x.ok));
+  const hasMat=folders.some(f=>(f.files||[]).some(x=>x.ok||(x.txt&&x.txt.length>5)));
   c.innerHTML=`
     <div class="tt">📅 Plan de Estudio</div>
     <div class="ts">Plan diario personalizado hasta el examen.</div>
@@ -921,12 +921,6 @@ function SD(){const s=G();if(!s)return;s.date=document.getElementById("di").valu
 
 init();
 
-// ── SERVICE WORKER ──
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
-  });
-}
 </script>
 </body>
 </html>
