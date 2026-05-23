@@ -487,11 +487,11 @@ async function GF3(){
   document.getElementById("FO").innerHTML=`<div class="lbox"><div class="spin"></div><p>Creando tarjetas...</p></div>`;
   const txt=tf.map(f=>f.txt).join("\n\n");
   try{
-    const base50=`Materia "${fo.name}" UDELAR. SOLO array JSON sin texto extra ni backticks: [{"q":"pregunta concisa","a":"respuesta 1-3 oraciones"},...]\n\nMATERIAL:\n${txt.substring(0,12000)}`;
+    const base50="Materia \""+fo.name+"\" UDELAR. SOLO array JSON sin texto extra: [{"+'"'+"q"+'"'+":"+'"'+"pregunta"+'"'+","+'"'+"a"+'"'+":"+'"'+"respuesta"+'"'+"},...]\n\nMATERIAL:\n"+txt.substring(0,12000);
     const [r50a,r50b,r50c]=await Promise.all([
-      AI(base50+`\n\nCreá exactamente 17 flashcards sobre los PRIMEROS conceptos del material. Empezá desde el concepto 1.`,2000),
-      AI(base50+`\n\nCreá exactamente 17 flashcards sobre los CONCEPTOS DEL MEDIO del material. No repitas las primeras.`,2000),
-      AI(base50+`\n\nCreá exactamente 16 flashcards sobre los ÚLTIMOS conceptos y normativa del material. No repitas anteriores.`,2000)
+      AI(base50+"\n\nCreá exactamente 17 flashcards sobre los PRIMEROS conceptos. Solo array JSON.",2000),
+      AI(base50+"\n\nCreá exactamente 17 flashcards sobre conceptos del MEDIO. No repitas anteriores. Solo array JSON.",2000),
+      AI(base50+"\n\nCreá exactamente 16 flashcards sobre los ÚLTIMOS conceptos y normativa. No repitas anteriores. Solo array JSON.",2000)
     ]);
     const parse50=r=>{const x=r.replace(/\`\`\`json|\`\`\`/g,"").trim();return JSON.parse(x.substring(x.indexOf("["),x.lastIndexOf("]")+1))};
     fo.cards=[...parse50(r50a),...parse50(r50b),...parse50(r50c)];SV();
@@ -779,16 +779,12 @@ async function GMAP(){
   if(!tf.length)return;
   const mapo=document.getElementById("MAPO");
   mapo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando mapa mental...</p></div>`;
-  const txt=tf.map(f=>f.txt).join("
-
-").substring(0,15000);
+  const txt=tf.map(f=>f.txt).join("\n\n").substring(0,15000);
   try{
-    const raw=(await AI(`Analizá este material de "${fo.name}" y creá un mapa mental. Devolvé SOLO JSON sin backticks:
-{"centro":"${fo.name}","ramas":[{"titulo":"Rama 1","conceptos":["concepto1","concepto2","concepto3"]},{"titulo":"Rama 2","conceptos":["..."]},...]}
-Máximo 8 ramas, 4-6 conceptos por rama. Conceptos cortos (max 6 palabras).
-
-MATERIAL:
-${txt}`,2000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const gmapPrompt="Analizá este material de \""+fo.name+"\" y creá un mapa mental. Devolvé SOLO JSON sin backticks ni texto extra:\n"+
+      '{"centro":"TEMA","ramas":[{"titulo":"Rama","conceptos":["c1","c2","c3"]}]}\n'+
+      "Máximo 8 ramas, 4-6 conceptos cortos por rama.\n\nMATERIAL:\n"+txt;
+    const raw=(await AI(gmapPrompt,2000)).replace(/```json|```/g,"").trim();
     const st=raw.indexOf("{"),en=raw.lastIndexOf("}");
     fo.mapa=JSON.parse(raw.substring(st,en+1));SV();
     mapo.innerHTML=renderMapa(fo.mapa);
@@ -832,16 +828,12 @@ async function GESQ(){
   if(!tf.length)return;
   const esqo=document.getElementById("ESQO");
   esqo.innerHTML=`<div class="lbox"><div class="spin"></div><p>Generando esquema conceptual...</p></div>`;
-  const txt=tf.map(f=>f.txt).join("
-
-").substring(0,15000);
+  const txt=tf.map(f=>f.txt).join("\n\n").substring(0,15000);
   try{
-    const raw=(await AI(`Analizá este material de "${fo.name}" y creá un esquema conceptual jerárquico. Devolvé SOLO JSON sin backticks:
-[{"concepto":"Concepto Principal","definicion":"definición clara y concisa","subcategorias":[{"nombre":"Subcategoría","detalle":"explicación","items":["item1","item2"]}]}]
-Máximo 6 conceptos principales, 3-4 subcategorías por concepto, 3-5 items por subcategoría. Sé específico con el material.
-
-MATERIAL:
-${txt}`,3000)).replace(/\`\`\`json|\`\`\`/g,"").trim();
+    const gesqPrompt="Analizá este material de \""+fo.name+"\" y creá un esquema conceptual jerárquico. Devolvé SOLO JSON sin backticks:\n"+
+      '[{"concepto":"...","definicion":"...","subcategorias":[{"nombre":"...","detalle":"...","items":["item1","item2"]}]}]\n'+
+      "Máximo 6 conceptos, 3-4 subcategorías, 3-5 items. Sé específico.\n\nMATERIAL:\n"+txt;
+    const raw=(await AI(gesqPrompt,3000)).replace(/```json|```/g,"").trim();
     const st=raw.indexOf("["),en=raw.lastIndexOf("]");
     fo.esquema=JSON.parse(raw.substring(st,en+1));SV();
     esqo.innerHTML=renderEsq(fo.esquema);
